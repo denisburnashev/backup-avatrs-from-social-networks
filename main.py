@@ -1,8 +1,5 @@
 import requests
 import os
-import json
-from pprint import pprint
-
 
 with open('VKtoken.txt', 'r') as file_object:
     vktoken = file_object.read().strip()
@@ -10,9 +7,10 @@ with open('VKtoken.txt', 'r') as file_object:
 with open('Yatoken.txt', 'r') as file_object:
     yatoken = file_object.read().strip()
 
-photo_list = []
+PHOTO_LIST = []
 
-class VK_user:
+
+class VK_USER:
     url = 'https://api.vk.com/method/'
 
     def __init__(self, token, version):
@@ -29,7 +27,7 @@ class VK_user:
             user_id = self.owner_id
         photos_url = self.url + 'photos.get'
         photos_param = {
-            'owner_id': user_id,
+            'owner_ids': user_id,
             'album_id': 'profile',
             'offset': 0,
             'count': 50,
@@ -38,57 +36,33 @@ class VK_user:
         res = requests.get(photos_url, params={**self.params, **photos_param})
         res = res.json()
         data = res['response']['items']
-        user_input = input('Куда схоранить фотографии:\n'
-                           'current - для скачивания фотографий в корень программы\n'
-                           'new_folder - для создания новой папки в корне программы'
-                           ' и последующего сохранения фотографий в новой папке\n'
-                           'change - для смены пути скачивания фотографий(введите абсолютный путь)\n')
-        if user_input == 'current':
-            os.chdir('C:\home work\VK backup photos')
-        elif user_input == 'new_folder':
-            user_input = input('Введите название новой папки:\n')
-            os.mkdir(user_input)
-            os.chdir('C:\home work\VK backup photos\\'+user_input)
-        elif user_input == 'change':
-            user_input = input('Введите название пути куда вы желаете сохранить фотографии:\n')
-            os.chdir(user_input)
         for photo in data:
-            file_name = str(photo['likes']['count'])+'.jpg'
+            file_name = str(photo['likes']['count']) + '.jpg'
+            if file_name in PHOTO_LIST:
+                file_name = str(photo['likes']['count']) + '_' + str(photo['date']) + '.jpg'
             file_url = photo['sizes'][-1]['url']
             download_link = requests.get(file_url)
-            photo_list.append(file_name)
+            PHOTO_LIST.append(file_name)
 
             with open(file_name, 'wb') as file:
                 file.write(download_link.content)
             print(f'{file_name} downloading complete.')
-        print(f'Downloading complete. {len(photo_list)} have been downloaded.')
+        print(f'Downloading complete. {len(PHOTO_LIST)}photos have been downloaded.')
 
 
-class YaUploader:
+class YAUPLOADER:
     def __init__(self, token: str):
         self.token = token
-
-    # def new_folder_Yandisk(self):
-    #     user_input = input('Введите название новой папки:\n')
-    #     respon = requests.put('https://cloud-api.yandex.net/v1/disk/resources',
-    #                           params={'path': user_input},
-    #                           headers={"Authorization": f"OAuth {self.token}"})
-    #     if respon.status_code == 409:
-    #         print('Папка с таким названием уже существует')
-    #     pprint(respon.json)
-
-
-
 
     def upload(self):
         user_input = input('Введите команду:\n'
                            'current - для загрузки фотографий в корень Yandex Диск\n'
                            'new_folder - для загрузки фотографий в новую папку\n')
         if user_input == 'current':
-            for photo in photo_list:
+            for photo in PHOTO_LIST:
                 respon = requests.get('https://cloud-api.yandex.net/v1/disk/resources/upload',
-                                    params={'path': photo, 'overwrite':'true'},
-                                    headers={"Authorization": f"OAuth {self.token}"})
+                                      params={'path': photo, 'overwrite': 'true'},
+                                      headers={"Authorization": f"OAuth {self.token}"})
                 answer = respon.json()
                 upload_link = answer['href']
 
@@ -96,30 +70,41 @@ class YaUploader:
                     requests.put(upload_link, files={'file': upload_photos})
                     print(f'{photo} uploading complete')
             print(f'uploading your profile photos from social network has been completed')
-        # elif user_input == 'new_folder':
-        #     user_input = input('Введите название новой папки:\n')
-        #     respon = requests.put('https://cloud-api.yandex.net/v1/disk/resources',
-        #                     params={'path': user_input},
-        #                     headers={"Authorization": f"OAuth {self.token}"})
-        #     answer = respon.json()
-        #     upload_link = answer['href']
-        #     for photo in photo_list:
-        #         with open(photo, 'rb') as upload_photos:
-        #             requests.put(upload_link, files={'file': upload_photos})
-        #             print(f'{photo} uploading complete')
-        #     print(f'uploading your profile photos from social network has been completed')
+
+
+def selecting_folder():
+    user_input = input('Куда сохранить фотографии:\n'
+                       'folder - для просмотра выбранного пути\n'
+                       'change - для смены пути (введите абсолютный путь)\n')
+    if user_input == 'folder':
+        print(f'Путь для скачивания фотографий:\n{os.getcwd()}')
+        user_input = input('Введите:\nсonfirm - для подтверждения пути\nback - для возврата в предыдущие меню\n')
+        if user_input == 'confirm':
+            return f'фотографии будут сохранены в\n{os.getcwd()}'
+        elif user_input == 'back':
+            return selecting_folder()
+    elif user_input == 'change':
+        user_input = input('Введите путь куда вы желаете сохранить фотографии:\n')
+        os.chdir(user_input)
+        print(f'фотографии будут сохранены в {os.getcwd()}')
+        user_input = input('Введите:\nсonfirm - для подтверждения пути\nback - для возврата в предыдущие меню\n')
+        if user_input == 'confirm':
+            return f'фотографии будут сохранены в\n{os.getcwd()}'
+        elif user_input == 'back':
+            return selecting_folder()
 
 
 def main():
     while True:
-        vkuser = VK_user(vktoken, '5.126')
-        yan = YaUploader(yatoken)
+        vkuser = VK_USER(vktoken, '5.126')
+        yan = YAUPLOADER(yatoken)
         user_input = input('Введите команду:\n'
                            'VK - для скачивания фотографий профиля с вКонтактке\n'
                            'photos - для просмотра списка скаченных фото\n'
                            'exit - для выхода\n')
         if user_input == 'VK':
-            user_input = input('Введите id профиля, фотографии кторого вы хотите скачать:\n')
+            print(selecting_folder())
+            user_input = input('Введите id или username профиля, фотографии кторого вы хотите скачать:\n')
             vkuser.get_photos(user_input)
             user_input = input('Введите:\n'
                                'backup - для загрузки фоторграфий на Яндекс Диск\n'
@@ -130,9 +115,9 @@ def main():
                 main()
                 break
         elif user_input == 'photos':
-            print(photo_list)
+            print(PHOTO_LIST)
         elif user_input == 'exit':
             break
 
+
 print(main())
-14869974
